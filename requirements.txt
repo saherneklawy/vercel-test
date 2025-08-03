@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+langchain
+langchain-community
+langchain-core
+langchain-openai
+langchain-anthropic
+langchain-google-genai
+langchain-ollama
+gradio
