@@ -1,10 +1,6 @@
 import datetime
 import os
-import logging
 from langchain.chat_models import init_chat_model
-
-# Configure logging
-logger = logging.getLogger(__name__)
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, BaseMessage
 try:
     from langchain_community.chat_message_histories import SQLChatMessageHistory
@@ -94,11 +90,8 @@ class DietChatBot:
         with open("prompt.md", "r") as f:
             system_message = f.read()
 
-        logger.info(f"Initializing chat model: {DEFAULT_MODEL}")
         self.model = init_chat_model(model=DEFAULT_MODEL, temperature=0)
-        logger.info(f"Model initialized successfully: {type(self.model)}")
         self.system_msg = SystemMessage(content=system_message)
-        logger.info(f"System message created: {len(system_message)} chars")
 
         self._initialize_session(session_id)
         self._initialize_history()
@@ -134,123 +127,30 @@ class DietChatBot:
 
     def _initialize_history(self) -> None:
         """Initialize or load the conversation for the current session."""
-        logger.info(f"Initializing SQLChatMessageHistory for session: {self.session_id}")
-        logger.info(f"DB connection string: {DB_CONNECTION_STRING[:50]}...")
-        
-        # Try different SQLChatMessageHistory initialization approaches
-        try:
-            self.history = SQLChatMessageHistory(
-                session_id=self.session_id, 
-                connection_string=DB_CONNECTION_STRING
-            )
-            logger.info("SQLChatMessageHistory created successfully")
-        except Exception as e:
-            logger.error(f"Failed to create SQLChatMessageHistory: {e}")
-            # Try with table_name parameter
-            try:
-                self.history = SQLChatMessageHistory(
-                    session_id=self.session_id, 
-                    connection_string=DB_CONNECTION_STRING,
-                    table_name="message_store"
-                )
-                logger.info("SQLChatMessageHistory created with table_name parameter")
-            except Exception as e2:
-                logger.error(f"Failed with table_name parameter: {e2}")
-                raise e
-        
-        # Only add system message for new sessions (empty history)
-        try:
-            existing_messages = self.history.get_messages()
-            logger.info(f"Found {len(existing_messages)} existing messages")
-            if not existing_messages:
-                logger.info("Adding system message to new session")
-                self.history.add_message(self.system_msg)
-        except Exception as e:
-            logger.error(f"Error checking/adding system message: {e}")
-            # Clear the session and start fresh
-            logger.info("Clearing corrupted session and starting fresh")
-            with psycopg2.connect(DB_CONNECTION_STRING) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM message_store WHERE session_id = %s", (self.session_id,))
-                    conn.commit()
-            # Add system message to fresh session
+        self.history = SQLChatMessageHistory(
+            session_id=self.session_id, connection_string=DB_CONNECTION_STRING
+        )
+        if not self.history.get_messages():
             self.history.add_message(self.system_msg)
 
     # main new code for streaming
     def stream_response(self, user_message: str) -> Generator[str, None, None]:
         """Stream AI response chunks for a user message."""
-        logger.info(f"stream_response called with user_message: '{user_message}'")
-        
         # Check if message is empty
         if not (user_message := user_message.strip()):
-            logger.warning("Empty user message, returning")
             return
 
         # Add user message to history
-        logger.info("Adding user message to history")
-        human_msg = HumanMessage(content=user_message)
-        self.history.add_message(human_msg)
-        logger.info("Successfully added human message to history")
+        self.history.add_message(HumanMessage(content=user_message))
 
-        # Get messages for streaming
-        logger.info("Getting messages from history")
-        
-        # Let's inspect what's in the database first
-        try:
-            with psycopg2.connect(DB_CONNECTION_STRING) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("SELECT id, session_id, message, created_at FROM message_store WHERE session_id = %s ORDER BY id", (self.session_id,))
-                    raw_rows = cursor.fetchall()
-                    logger.info(f"Raw database has {len(raw_rows)} entries:")
-                    for row in raw_rows:
-                        logger.info(f"Row: id={row[0]}, session_id={row[1][:50]}..., message_type={type(row[2])}, created_at={row[3]}")
-                        if isinstance(row[2], dict):
-                            logger.info(f"Message content: {row[2]}")
-                        else:
-                            logger.info(f"Message content (first 200 chars): {str(row[2])[:200]}")
-        except Exception as db_e:
-            logger.error(f"Error inspecting database: {db_e}")
-        
-        # Now try to get messages via LangChain
-        try:
-            messages = self.history.get_messages()
-            logger.info(f"Retrieved {len(messages)} messages successfully")
-        except Exception as e:
-            logger.error(f"Error in get_messages(): {e}")
-            logger.error(f"Error type: {type(e)}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            raise e
-        logger.info(f"Messages to stream: {len(messages)} messages")
-        for i, msg in enumerate(messages):
-            logger.debug(f"Message {i}: {type(msg)} - {msg.content[:100] if hasattr(msg, 'content') else str(msg)[:100]}")
-        
+        # Stream response from chatbot
         response_content = ""
-        try:
-            logger.info("Calling self.model.stream(messages)")
-            # Add a simple test to see if the model can handle the messages at all
-            logger.info("Testing model with basic invoke first")
-            test_response = self.model.invoke(messages[:2])  # Just test with system + first human message
-            logger.info(f"Test response successful: {type(test_response)}")
-            
-            logger.info("Now starting actual streaming")
-            for chunk in self.model.stream(messages):
-                logger.debug(f"Received chunk: {chunk} (type: {type(chunk)})")
-                logger.debug(f"Chunk content: {chunk.content} (type: {type(chunk.content)})")
-                
-                if chunk.content:
-                    # Ensure chunk.content is a string
-                    content_str = str(chunk.content)
-                    response_content += content_str
-                    logger.debug(f"Yielding content_str: '{content_str}' (type: {type(content_str)})")
-                    yield content_str
-        except Exception as e:
-            logger.error(f"Error during model streaming: {e} (type: {type(e)})")
-            logger.error(f"Error details: {str(e)}")
-            raise e
+        for chunk in self.model.stream(self.history.get_messages()):
+            if chunk.content:
+                response_content += chunk.content
+                yield chunk.content
 
         # Add final response to history
-        logger.info(f"Adding final response to history: '{response_content}'")
         self.history.add_message(AIMessage(content=response_content))
 
     def new_session(self) -> None:
