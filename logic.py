@@ -15,7 +15,7 @@ load_dotenv()
 DEFAULT_MODEL = "gpt-4o-mini"
 
 # PostgreSQL connection string from environment
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL_UNPOOLED")
 if not DATABASE_URL:
     # Fallback to individual components for development
     DB_HOST = os.getenv("DB_HOST", "localhost")
