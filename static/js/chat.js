@@ -2,7 +2,7 @@
 
 class ChatManager {
     constructor() {
-        this.websocket = null;
+        this.eventSource = null;
         this.currentSessionId = null;
         this.isStreaming = false;
         this.currentStreamingMessage = null;
@@ -78,7 +78,7 @@ class ChatManager {
             option.selected = true;
             this.sessionSelect.insertBefore(option, this.sessionSelect.children[1]);
             
-            this.connectWebSocket();
+            this.updateConnectionStatus('connected', 'Ready');
         } catch (error) {
             console.error('Error creating new session:', error);
             this.updateConnectionStatus('disconnected', 'Error creating session');
@@ -101,46 +101,21 @@ class ChatManager {
                 this.addMessage(message.role, message.content, false);
             });
             
-            this.connectWebSocket();
+            this.updateConnectionStatus('connected', 'Ready');
         } catch (error) {
             console.error('Error loading session:', error);
             this.updateConnectionStatus('disconnected', 'Error loading session');
         }
     }
     
-    connectWebSocket() {
-        if (this.websocket) {
-            this.websocket.close();
+    closeEventSource() {
+        if (this.eventSource) {
+            this.eventSource.close();
+            this.eventSource = null;
         }
-        
-        if (!this.currentSessionId) return;
-        
-        this.updateConnectionStatus('connecting', 'Connecting...');
-        
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/${this.currentSessionId}`;
-        
-        this.websocket = new WebSocket(wsUrl);
-        
-        this.websocket.onopen = () => {
-            this.updateConnectionStatus('connected', 'Connected');
-        };
-        
-        this.websocket.onmessage = (event) => {
-            this.handleWebSocketMessage(JSON.parse(event.data));
-        };
-        
-        this.websocket.onclose = () => {
-            this.updateConnectionStatus('disconnected', 'Disconnected');
-        };
-        
-        this.websocket.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            this.updateConnectionStatus('disconnected', 'Connection error');
-        };
     }
     
-    handleWebSocketMessage(data) {
+    handleServerSentEvent(data) {
         switch (data.type) {
             case 'message_received':
                 // Message was received by server
@@ -160,7 +135,7 @@ class ChatManager {
                     this.currentStreamingMessage = null;
                 }
                 this.isStreaming = false;
-                this.updateConnectionStatus('connected', 'Connected');
+                this.updateConnectionStatus('connected', 'Ready');
                 break;
                 
             case 'error':
@@ -172,14 +147,14 @@ class ChatManager {
                     this.currentStreamingMessage = null;
                 }
                 this.isStreaming = false;
-                this.updateConnectionStatus('connected', 'Connected');
+                this.updateConnectionStatus('connected', 'Ready');
                 break;
         }
     }
     
-    sendMessage() {
+    async sendMessage() {
         const message = this.messageInput.value.trim();
-        if (!message || !this.websocket || this.websocket.readyState !== WebSocket.OPEN || this.isStreaming) {
+        if (!message || !this.currentSessionId || this.isStreaming) {
             return;
         }
         
@@ -192,13 +167,59 @@ class ChatManager {
         // Add streaming assistant message
         this.currentStreamingMessage = this.addMessage('assistant', '', true);
         
-        // Send message via WebSocket
-        this.websocket.send(JSON.stringify({
-            message: message
-        }));
-        
         this.isStreaming = true;
         this.updateConnectionStatus('connected', 'Thinking...');
+        
+        try {
+            // Send message via fetch POST to SSE endpoint
+            const response = await fetch(`/api/chat/${this.currentSessionId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            // Create EventSource for the streaming response
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            this.handleServerSentEvent(data);
+                        } catch (e) {
+                            // Ignore malformed JSON
+                        }
+                    }
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error sending message:', error);
+            if (this.currentStreamingMessage) {
+                const messageText = this.currentStreamingMessage.querySelector('.message-text');
+                messageText.textContent = `Error: ${error.message}`;
+                this.currentStreamingMessage.classList.remove('streaming');
+                this.currentStreamingMessage = null;
+            }
+            this.isStreaming = false;
+            this.updateConnectionStatus('connected', 'Ready');
+        }
     }
     
     addMessage(role, content, streaming = false) {
