@@ -137,13 +137,26 @@ class DietChatBot:
 
         # Add user message to history
         logger.info("Adding user message to history")
-        self.history.add_message(HumanMessage(content=user_message))
+        try:
+            human_msg = HumanMessage(content=user_message)
+            logger.info(f"Created HumanMessage: {type(human_msg)}")
+            self.history.add_message(human_msg)
+            logger.info("Successfully added human message to history")
+        except Exception as e:
+            logger.error(f"Error adding message to history: {e} (type: {type(e)})")
+            raise e
 
         # Stream response
         logger.info("Starting model streaming")
         
         # Get messages and log them
-        messages = self.history.get_messages()
+        try:
+            logger.info("Calling self.history.get_messages()")
+            messages = self.history.get_messages()
+            logger.info(f"Retrieved messages successfully: {len(messages)} messages")
+        except Exception as e:
+            logger.error(f"Error getting messages from history: {e} (type: {type(e)})")
+            raise e
         logger.info(f"Messages to stream: {len(messages)} messages")
         for i, msg in enumerate(messages):
             logger.debug(f"Message {i}: {type(msg)} - {msg.content[:100] if hasattr(msg, 'content') else str(msg)[:100]}")
