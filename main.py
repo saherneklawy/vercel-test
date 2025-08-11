@@ -139,21 +139,21 @@ async def send_message(session_id: str, request: Request):
                 except Exception as json_err:
                     logger.error(f"Failed to serialize error data: {json_err}")
                     yield f"data: {json.dumps({'type': 'error', 'content': 'JSON serialization error'})}\n\n"
+        
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Cache-Control"
+            }
+        )
                     
     except Exception as e:
         logger.error(f"Error in send_message endpoint: {e} (type: {type(e)})")
         raise HTTPException(status_code=500, detail=str(e))
-    
-    return StreamingResponse(
-        generate_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Cache-Control"
-        }
-    )
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
