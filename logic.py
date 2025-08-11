@@ -119,11 +119,63 @@ class DietChatBot:
 
     def _initialize_history(self) -> None:
         """Initialize or load the conversation for the current session."""
-        self.history = SQLChatMessageHistory(
-            session_id=self.session_id, connection_string=DB_CONNECTION_STRING
-        )
-        if not self.history.get_messages():
-            self.history.add_message(self.system_msg)
+        try:
+            self.history = SQLChatMessageHistory(
+                session_id=self.session_id, connection_string=DB_CONNECTION_STRING
+            )
+            # Test if we can get messages without error
+            test_messages = self.history.get_messages()
+            logger.info(f"SQLChatMessageHistory working fine: {len(test_messages)} messages")
+            if not test_messages:
+                self.history.add_message(self.system_msg)
+        except Exception as e:
+            logger.error(f"SQLChatMessageHistory failed: {e}")
+            logger.info("Falling back to simple in-memory conversation with manual DB storage")
+            # Fallback: use simple list and handle persistence manually
+            self.history = []
+            self._load_messages_from_db()
+            if not self.history:
+                self.history.append(self.system_msg)
+                
+    def _load_messages_from_db(self) -> None:
+        """Load messages from database manually (fallback method)."""
+        try:
+            with psycopg2.connect(DB_CONNECTION_STRING) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT message FROM message_store WHERE session_id = %s ORDER BY id", (self.session_id,))
+                    rows = cursor.fetchall()
+                    for (message_json,) in rows:
+                        # Simple manual deserialization
+                        if isinstance(message_json, dict):
+                            msg_type = message_json.get('type', '')
+                            content = message_json.get('data', {}).get('content', '')
+                            if msg_type == 'system':
+                                self.history.append(SystemMessage(content=content))
+                            elif msg_type == 'human':
+                                self.history.append(HumanMessage(content=content))
+                            elif msg_type == 'ai':
+                                self.history.append(AIMessage(content=content))
+        except Exception as e:
+            logger.error(f"Error loading messages from DB: {e}")
+            
+    def _save_message_to_db(self, message: BaseMessage) -> None:
+        """Save a message to database manually (fallback method)."""
+        try:
+            with psycopg2.connect(DB_CONNECTION_STRING) as conn:
+                with conn.cursor() as cursor:
+                    # Simple manual serialization
+                    msg_type = message.__class__.__name__.lower().replace('message', '')
+                    message_data = {
+                        'type': msg_type,
+                        'data': {'content': message.content}
+                    }
+                    cursor.execute(
+                        "INSERT INTO message_store (session_id, message) VALUES (%s, %s)",
+                        (self.session_id, json.dumps(message_data))
+                    )
+                    conn.commit()
+        except Exception as e:
+            logger.error(f"Error saving message to DB: {e}")
 
     # main new code for streaming
     def stream_response(self, user_message: str) -> Generator[str, None, None]:
@@ -140,7 +192,16 @@ class DietChatBot:
         try:
             human_msg = HumanMessage(content=user_message)
             logger.info(f"Created HumanMessage: {type(human_msg)}")
-            self.history.add_message(human_msg)
+            
+            # Handle both SQLChatMessageHistory and simple list
+            if hasattr(self.history, 'add_message'):
+                # SQLChatMessageHistory
+                self.history.add_message(human_msg)
+            else:
+                # Simple list fallback
+                self.history.append(human_msg)
+                self._save_message_to_db(human_msg)
+            
             logger.info("Successfully added human message to history")
         except Exception as e:
             logger.error(f"Error adding message to history: {e} (type: {type(e)})")
@@ -151,8 +212,16 @@ class DietChatBot:
         
         # Get messages and log them
         try:
-            logger.info("Calling self.history.get_messages()")
-            messages = self.history.get_messages()
+            logger.info("Getting messages from history")
+            
+            # Handle both SQLChatMessageHistory and simple list
+            if hasattr(self.history, 'get_messages'):
+                # SQLChatMessageHistory
+                messages = self.history.get_messages()
+            else:
+                # Simple list fallback
+                messages = self.history
+            
             logger.info(f"Retrieved messages successfully: {len(messages)} messages")
         except Exception as e:
             logger.error(f"Error getting messages from history: {e} (type: {type(e)})")
@@ -187,7 +256,16 @@ class DietChatBot:
 
         # Add final response to history
         logger.info(f"Adding final response to history: '{response_content}'")
-        self.history.add_message(AIMessage(content=response_content))
+        ai_msg = AIMessage(content=response_content)
+        
+        # Handle both SQLChatMessageHistory and simple list
+        if hasattr(self.history, 'add_message'):
+            # SQLChatMessageHistory
+            self.history.add_message(ai_msg)
+        else:
+            # Simple list fallback
+            self.history.append(ai_msg)
+            self._save_message_to_db(ai_msg)
 
     def new_session(self) -> None:
         """Create a new conversation."""
@@ -204,7 +282,12 @@ class DietChatBot:
 
     def get_messages(self) -> List[BaseMessage]:
         """Get all messages from the current session."""
-        return self.history.get_messages()
+        if hasattr(self.history, 'get_messages'):
+            # SQLChatMessageHistory
+            return self.history.get_messages()
+        else:
+            # Simple list fallback
+            return self.history
 
     @staticmethod
     def get_previous_conversations() -> List[str]:
