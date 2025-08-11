@@ -182,8 +182,33 @@ class DietChatBot:
 
         # Get messages for streaming
         logger.info("Getting messages from history")
-        messages = self.history.get_messages()
-        logger.info(f"Retrieved {len(messages)} messages successfully")
+        
+        # Let's inspect what's in the database first
+        try:
+            with psycopg2.connect(DB_CONNECTION_STRING) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT id, session_id, message, created_at FROM message_store WHERE session_id = %s ORDER BY id", (self.session_id,))
+                    raw_rows = cursor.fetchall()
+                    logger.info(f"Raw database has {len(raw_rows)} entries:")
+                    for row in raw_rows:
+                        logger.info(f"Row: id={row[0]}, session_id={row[1][:50]}..., message_type={type(row[2])}, created_at={row[3]}")
+                        if isinstance(row[2], dict):
+                            logger.info(f"Message content: {row[2]}")
+                        else:
+                            logger.info(f"Message content (first 200 chars): {str(row[2])[:200]}")
+        except Exception as db_e:
+            logger.error(f"Error inspecting database: {db_e}")
+        
+        # Now try to get messages via LangChain
+        try:
+            messages = self.history.get_messages()
+            logger.info(f"Retrieved {len(messages)} messages successfully")
+        except Exception as e:
+            logger.error(f"Error in get_messages(): {e}")
+            logger.error(f"Error type: {type(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise e
         logger.info(f"Messages to stream: {len(messages)} messages")
         for i, msg in enumerate(messages):
             logger.debug(f"Message {i}: {type(msg)} - {msg.content[:100] if hasattr(msg, 'content') else str(msg)[:100]}")
