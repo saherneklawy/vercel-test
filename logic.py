@@ -39,12 +39,24 @@ def initialize_database():
     try:
         with psycopg2.connect(DB_CONNECTION_STRING) as conn:
             with conn.cursor() as cursor:
-                # Create the message_store table if it doesn't exist
+                # Check if table exists with wrong schema (JSONB column)
+                cursor.execute("""
+                    SELECT data_type 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'message_store' AND column_name = 'message';
+                """)
+                result = cursor.fetchone()
+                
+                if result and result[0] == 'jsonb':
+                    print("Found existing table with JSONB schema, dropping for clean recreation")
+                    cursor.execute("DROP TABLE IF EXISTS message_store;")
+                
+                # Create the message_store table with correct TEXT schema for LangChain
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS message_store (
                         id SERIAL PRIMARY KEY,
                         session_id TEXT NOT NULL,
-                        message JSONB NOT NULL,
+                        message TEXT NOT NULL,
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                     );
                 """)
@@ -62,7 +74,7 @@ def initialize_database():
                 """)
                 
                 conn.commit()
-                print("Database tables initialized successfully")
+                print("Database tables initialized successfully with correct schema")
                 
     except psycopg2.Error as e:
         print(f"Error initializing database: {e}")
