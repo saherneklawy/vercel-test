@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 from typing import List, Optional, Generator
 import psycopg2
 from psycopg2 import sql
-from sqlalchemy import create_engine
 
 # Load environment variables
 load_dotenv()
@@ -27,13 +26,6 @@ if not DATABASE_URL:
     DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 DB_CONNECTION_STRING = DATABASE_URL
-
-# Create SQLAlchemy engine for LangChain
-try:
-    engine = create_engine(DATABASE_URL)
-except Exception as e:
-    print(f"Warning: Could not create SQLAlchemy engine: {e}")
-    engine = None
 
 def initialize_database():
     """Initialize the database tables if they don't exist."""
@@ -120,11 +112,8 @@ class DietChatBot:
 
     def _initialize_history(self) -> None:
         """Initialize or load the conversation for the current session."""
-        if engine is None:
-            raise RuntimeError("SQLAlchemy engine not initialized")
-            
         self.history = SQLChatMessageHistory(
-            session_id=self.session_id, connection=engine
+            session_id=self.session_id, connection_string=DB_CONNECTION_STRING
         )
         if not self.history.get_messages():
             self.history.add_message(self.system_msg)
