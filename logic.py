@@ -15,17 +15,17 @@ load_dotenv()
 DEFAULT_MODEL = "gpt-4o-mini"
 
 # PostgreSQL connection string from environment
-DATABASE_POSTGRES_URL = os.getenv("DATABASE_POSTGRES_URL")
-if not DATABASE_POSTGRES_URL:
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
     # Fallback to individual components for development
     DB_HOST = os.getenv("DB_HOST", "localhost")
     DB_PORT = os.getenv("DB_PORT", "5432")
     DB_NAME = os.getenv("DB_NAME", "diet_assistant")
     DB_USER = os.getenv("DB_USER", "postgres")
     DB_PASSWORD = os.getenv("DB_PASSWORD", "password")
-    DATABASE_POSTGRES_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-DB_CONNECTION_STRING = DATABASE_POSTGRES_URL
+DB_CONNECTION_STRING = DATABASE_URL
 
 def initialize_database():
     """Initialize the database tables if they don't exist."""
