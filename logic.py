@@ -1,6 +1,10 @@
 import datetime
 import os
+import logging
 from langchain.chat_models import init_chat_model
+
+# Configure logging
+logger = logging.getLogger(__name__)
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, BaseMessage
 from langchain_community.chat_message_histories import SQLChatMessageHistory
 from dotenv import load_dotenv
@@ -121,21 +125,33 @@ class DietChatBot:
     # main new code for streaming
     def stream_response(self, user_message: str) -> Generator[str, None, None]:
         """Stream AI response chunks for a user message."""
+        logger.info(f"stream_response called with user_message: '{user_message}'")
+        
         # Check if message is empty
         if not (user_message := user_message.strip()):
+            logger.warning("Empty user message, returning")
             return
 
         # Add user message to history
+        logger.info("Adding user message to history")
         self.history.add_message(HumanMessage(content=user_message))
 
         # Stream response
+        logger.info("Starting model streaming")
         response_content = ""
         for chunk in self.model.stream(self.history.get_messages()):
+            logger.debug(f"Received chunk: {chunk} (type: {type(chunk)})")
+            logger.debug(f"Chunk content: {chunk.content} (type: {type(chunk.content)})")
+            
             if chunk.content:
-                response_content += chunk.content
-                yield chunk.content
+                # Ensure chunk.content is a string
+                content_str = str(chunk.content)
+                response_content += content_str
+                logger.debug(f"Yielding content_str: '{content_str}' (type: {type(content_str)})")
+                yield content_str
 
         # Add final response to history
+        logger.info(f"Adding final response to history: '{response_content}'")
         self.history.add_message(AIMessage(content=response_content))
 
     def new_session(self) -> None:
