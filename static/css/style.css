@@ -1,0 +1,183 @@
+/* Custom styles for the Diet Planning Assistant */
+
+/* Message styling */
+.message.user .avatar {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.message.user .avatar::before {
+    content: "👤";
+}
+
+.message.assistant .avatar {
+    background-color: #10b981;
+    color: white;
+}
+
+.message.assistant .avatar::before {
+    content: "🤖";
+}
+
+.message.user .content {
+    background-color: #eff6ff;
+    border-left: 4px solid #3b82f6;
+}
+
+.message.assistant .content {
+    background-color: #f0fdf4;
+    border-left: 4px solid #10b981;
+}
+
+/* Streaming animation */
+.streaming {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Typing indicator */
+.typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem 0;
+}
+
+.typing-indicator span {
+    height: 0.5rem;
+    width: 0.5rem;
+    background-color: #9ca3af;
+    border-radius: 50%;
+    animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.typing-indicator span:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes typing {
+    0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Connection status styling */
+.connection-status.connected {
+    color: #10b981;
+}
+
+.connection-status.disconnected {
+    color: #ef4444;
+}
+
+.connection-status.connecting {
+    color: #f59e0b;
+}
+
+/* Responsive design improvements */
+@media (max-width: 640px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    #chatMessages {
+        height: 24rem;
+    }
+}
+
+/* Smooth scrolling for chat messages */
+#chatMessages {
+    scroll-behavior: smooth;
+}
+
+/* Input focus improvements */
+#messageInput:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Button hover effects */
+button:disabled {
+    cursor: not-allowed;
+}
+
+button:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Message content formatting */
+.message-text {
+    line-height: 1.6;
+    word-wrap: break-word;
+}
+
+.message-text h1,
+.message-text h2,
+.message-text h3,
+.message-text h4,
+.message-text h5,
+.message-text h6 {
+    margin: 1rem 0 0.5rem 0;
+    font-weight: 600;
+}
+
+.message-text p {
+    margin: 0.5rem 0;
+}
+
+.message-text ul,
+.message-text ol {
+    margin: 0.5rem 0 0.5rem 1.5rem;
+}
+
+.message-text li {
+    margin: 0.25rem 0;
+}
+
+.message-text strong {
+    font-weight: 600;
+}
+
+.message-text em {
+    font-style: italic;
+}
+
+/* Code formatting */
+.message-text code {
+    background-color: #f3f4f6;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9em;
+}
+
+.message-text pre {
+    background-color: #f3f4f6;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    margin: 0.5rem 0;
+}
+
+.message-text pre code {
+    background: none;
+    padding: 0;
+}

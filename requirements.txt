@@ -1,2 +1,11 @@
 sqlalchemy
-gradio
+psycopg2-binary
+fastapi
+uvicorn[standard]
+jinja2
+python-multipart
+websockets
+python-dotenv
+langchain
+langchain-openai
+langchain-community

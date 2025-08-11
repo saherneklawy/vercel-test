@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow-lg p-6">
+    <!-- Session Management -->
+    <div class="mb-6 flex flex-col sm:flex-row gap-4">
+        <div class="flex-1">
+            <label for="sessionSelect" class="block text-sm font-medium text-gray-700 mb-2">
+                Previous Conversations
+            </label>
+            <select id="sessionSelect" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <option value="">Select a conversation...</option>
+            </select>
+        </div>
+        <div class="flex items-end">
+            <button id="newChatBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors duration-200">
+                🆕 New Chat
+            </button>
+        </div>
+    </div>
+
+    <!-- Chat Container -->
+    <div class="border border-gray-200 rounded-lg mb-4">
+        <!-- Chat Messages -->
+        <div id="chatMessages" class="h-96 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            <!-- Messages will be added here dynamically -->
+        </div>
+
+        <!-- Message Input -->
+        <div class="border-t border-gray-200 p-4 bg-white rounded-b-lg">
+            <div class="flex gap-2">
+                <input 
+                    type="text" 
+                    id="messageInput" 
+                    placeholder="Ask about nutrition or diet plans..." 
+                    class="flex-1 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled
+                >
+                <button 
+                    id="sendBtn" 
+                    class="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-6 py-3 rounded-md transition-colors duration-200"
+                    disabled
+                >
+                    💬 Send
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Status -->
+    <div id="connectionStatus" class="text-sm text-gray-500">
+        Connecting...
+    </div>
+</div>
+
+<!-- Message Template -->
+<template id="messageTemplate">
+    <div class="message flex gap-3">
+        <div class="avatar w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-medium">
+        </div>
+        <div class="content flex-1 bg-white rounded-lg p-3 shadow-sm">
+            <div class="text-sm text-gray-600 mb-1 role-label"></div>
+            <div class="message-text"></div>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Global variables for chat functionality
+    let currentSessionId = null;
+    let websocket = null;
+    let isStreaming = false;
+    
+    // Initialize chat when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeChat();
+    });
+</script>
+{% endblock %}
