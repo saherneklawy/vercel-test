@@ -74,8 +74,9 @@ async def get_session_messages(session_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/chat/{session_id}")
-async def send_message(session_id: str, message_data: dict):
+async def send_message(session_id: str, request: Request):
     """Send a message and get streaming response via SSE."""
+    message_data = await request.json()
     user_message = message_data.get("message", "").strip()
     
     if not user_message:
