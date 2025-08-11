@@ -26,7 +26,7 @@ For local development with PostgreSQL:
 createdb diet_assistant
 
 # Set environment variables in .env:
-DATABASE_URL=postgresql://username:password@localhost:5432/diet_assistant
+DATABASE_POSTGRES_URL=postgresql://username:password@localhost:5432/diet_assistant
 OPENAI_API_KEY=your_openai_api_key
 ```
 
@@ -66,7 +66,7 @@ Real-time communication using WebSocket protocol:
 ### Database Configuration
 PostgreSQL database with LangChain integration:
 - Uses `psycopg2-binary` for PostgreSQL adapter
-- Connection string from `DATABASE_URL` environment variable
+- Connection string from `DATABASE_POSTGRES_URL` environment variable
 - Fallback to individual DB_* environment variables for development
 - Uses LangChain's `SQLChatMessageHistory` with PostgreSQL backend
 - **Auto-initialization**: Tables and indexes created automatically on first request
@@ -85,7 +85,7 @@ Required environment variables:
 
 ### Database Configuration
 ```bash
-DATABASE_URL=postgresql://user:password@host:port/database
+DATABASE_POSTGRES_URL=postgresql://user:password@host:port/database
 # OR individual components:
 DB_HOST=localhost
 DB_PORT=5432
@@ -118,7 +118,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 ### Configuration (`vercel.json`)
 - Python 3.9 runtime with pipEnv
 - Static file routing for `/static/*` assets
-- Environment variables: `DATABASE_URL`, `OPENAI_API_KEY`
+- Environment variables: `DATABASE_POSTGRES_URL`, `OPENAI_API_KEY`
 - All other routes handled by FastAPI application
 
 ### PostgreSQL Setup
@@ -128,7 +128,7 @@ For production deployment, use managed PostgreSQL service:
 - Neon
 - Amazon RDS
 
-Set `DATABASE_URL` in Vercel environment variables.
+Set `DATABASE_POSTGRES_URL` in Vercel environment variables.
 
 **Database Schema**: The application automatically creates the following table structure:
 ```sql
