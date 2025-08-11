@@ -79,8 +79,11 @@ class DietChatBot:
         with open("prompt.md", "r") as f:
             system_message = f.read()
 
+        logger.info(f"Initializing chat model: {DEFAULT_MODEL}")
         self.model = init_chat_model(model=DEFAULT_MODEL, temperature=0)
+        logger.info(f"Model initialized successfully: {type(self.model)}")
         self.system_msg = SystemMessage(content=system_message)
+        logger.info(f"System message created: {len(system_message)} chars")
 
         self._initialize_session(session_id)
         self._initialize_history()
@@ -138,17 +141,36 @@ class DietChatBot:
 
         # Stream response
         logger.info("Starting model streaming")
+        
+        # Get messages and log them
+        messages = self.history.get_messages()
+        logger.info(f"Messages to stream: {len(messages)} messages")
+        for i, msg in enumerate(messages):
+            logger.debug(f"Message {i}: {type(msg)} - {msg.content[:100] if hasattr(msg, 'content') else str(msg)[:100]}")
+        
         response_content = ""
-        for chunk in self.model.stream(self.history.get_messages()):
-            logger.debug(f"Received chunk: {chunk} (type: {type(chunk)})")
-            logger.debug(f"Chunk content: {chunk.content} (type: {type(chunk.content)})")
+        try:
+            logger.info("Calling self.model.stream(messages)")
+            # Add a simple test to see if the model can handle the messages at all
+            logger.info("Testing model with basic invoke first")
+            test_response = self.model.invoke(messages[:2])  # Just test with system + first human message
+            logger.info(f"Test response successful: {type(test_response)}")
             
-            if chunk.content:
-                # Ensure chunk.content is a string
-                content_str = str(chunk.content)
-                response_content += content_str
-                logger.debug(f"Yielding content_str: '{content_str}' (type: {type(content_str)})")
-                yield content_str
+            logger.info("Now starting actual streaming")
+            for chunk in self.model.stream(messages):
+                logger.debug(f"Received chunk: {chunk} (type: {type(chunk)})")
+                logger.debug(f"Chunk content: {chunk.content} (type: {type(chunk.content)})")
+                
+                if chunk.content:
+                    # Ensure chunk.content is a string
+                    content_str = str(chunk.content)
+                    response_content += content_str
+                    logger.debug(f"Yielding content_str: '{content_str}' (type: {type(content_str)})")
+                    yield content_str
+        except Exception as e:
+            logger.error(f"Error during model streaming: {e} (type: {type(e)})")
+            logger.error(f"Error details: {str(e)}")
+            raise e
 
         # Add final response to history
         logger.info(f"Adding final response to history: '{response_content}'")
