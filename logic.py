@@ -6,7 +6,10 @@ from langchain.chat_models import init_chat_model
 # Configure logging
 logger = logging.getLogger(__name__)
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, BaseMessage
-from langchain_community.chat_message_histories import SQLChatMessageHistory
+try:
+    from langchain_community.chat_message_histories import SQLChatMessageHistory
+except ImportError:
+    from langchain.memory.chat_message_histories import SQLChatMessageHistory
 from dotenv import load_dotenv
 from typing import List, Optional, Generator
 import psycopg2
@@ -119,63 +122,47 @@ class DietChatBot:
 
     def _initialize_history(self) -> None:
         """Initialize or load the conversation for the current session."""
+        logger.info(f"Initializing SQLChatMessageHistory for session: {self.session_id}")
+        logger.info(f"DB connection string: {DB_CONNECTION_STRING[:50]}...")
+        
+        # Try different SQLChatMessageHistory initialization approaches
         try:
             self.history = SQLChatMessageHistory(
-                session_id=self.session_id, connection_string=DB_CONNECTION_STRING
+                session_id=self.session_id, 
+                connection_string=DB_CONNECTION_STRING
             )
-            # Test if we can get messages without error
-            test_messages = self.history.get_messages()
-            logger.info(f"SQLChatMessageHistory working fine: {len(test_messages)} messages")
-            if not test_messages:
+            logger.info("SQLChatMessageHistory created successfully")
+        except Exception as e:
+            logger.error(f"Failed to create SQLChatMessageHistory: {e}")
+            # Try with table_name parameter
+            try:
+                self.history = SQLChatMessageHistory(
+                    session_id=self.session_id, 
+                    connection_string=DB_CONNECTION_STRING,
+                    table_name="message_store"
+                )
+                logger.info("SQLChatMessageHistory created with table_name parameter")
+            except Exception as e2:
+                logger.error(f"Failed with table_name parameter: {e2}")
+                raise e
+        
+        # Only add system message for new sessions (empty history)
+        try:
+            existing_messages = self.history.get_messages()
+            logger.info(f"Found {len(existing_messages)} existing messages")
+            if not existing_messages:
+                logger.info("Adding system message to new session")
                 self.history.add_message(self.system_msg)
         except Exception as e:
-            logger.error(f"SQLChatMessageHistory failed: {e}")
-            logger.info("Falling back to simple in-memory conversation with manual DB storage")
-            # Fallback: use simple list and handle persistence manually
-            self.history = []
-            self._load_messages_from_db()
-            if not self.history:
-                self.history.append(self.system_msg)
-                
-    def _load_messages_from_db(self) -> None:
-        """Load messages from database manually (fallback method)."""
-        try:
+            logger.error(f"Error checking/adding system message: {e}")
+            # Clear the session and start fresh
+            logger.info("Clearing corrupted session and starting fresh")
             with psycopg2.connect(DB_CONNECTION_STRING) as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("SELECT message FROM message_store WHERE session_id = %s ORDER BY id", (self.session_id,))
-                    rows = cursor.fetchall()
-                    for (message_json,) in rows:
-                        # Simple manual deserialization
-                        if isinstance(message_json, dict):
-                            msg_type = message_json.get('type', '')
-                            content = message_json.get('data', {}).get('content', '')
-                            if msg_type == 'system':
-                                self.history.append(SystemMessage(content=content))
-                            elif msg_type == 'human':
-                                self.history.append(HumanMessage(content=content))
-                            elif msg_type == 'ai':
-                                self.history.append(AIMessage(content=content))
-        except Exception as e:
-            logger.error(f"Error loading messages from DB: {e}")
-            
-    def _save_message_to_db(self, message: BaseMessage) -> None:
-        """Save a message to database manually (fallback method)."""
-        try:
-            with psycopg2.connect(DB_CONNECTION_STRING) as conn:
-                with conn.cursor() as cursor:
-                    # Simple manual serialization
-                    msg_type = message.__class__.__name__.lower().replace('message', '')
-                    message_data = {
-                        'type': msg_type,
-                        'data': {'content': message.content}
-                    }
-                    cursor.execute(
-                        "INSERT INTO message_store (session_id, message) VALUES (%s, %s)",
-                        (self.session_id, json.dumps(message_data))
-                    )
+                    cursor.execute("DELETE FROM message_store WHERE session_id = %s", (self.session_id,))
                     conn.commit()
-        except Exception as e:
-            logger.error(f"Error saving message to DB: {e}")
+            # Add system message to fresh session
+            self.history.add_message(self.system_msg)
 
     # main new code for streaming
     def stream_response(self, user_message: str) -> Generator[str, None, None]:
@@ -189,43 +176,14 @@ class DietChatBot:
 
         # Add user message to history
         logger.info("Adding user message to history")
-        try:
-            human_msg = HumanMessage(content=user_message)
-            logger.info(f"Created HumanMessage: {type(human_msg)}")
-            
-            # Handle both SQLChatMessageHistory and simple list
-            if hasattr(self.history, 'add_message'):
-                # SQLChatMessageHistory
-                self.history.add_message(human_msg)
-            else:
-                # Simple list fallback
-                self.history.append(human_msg)
-                self._save_message_to_db(human_msg)
-            
-            logger.info("Successfully added human message to history")
-        except Exception as e:
-            logger.error(f"Error adding message to history: {e} (type: {type(e)})")
-            raise e
+        human_msg = HumanMessage(content=user_message)
+        self.history.add_message(human_msg)
+        logger.info("Successfully added human message to history")
 
-        # Stream response
-        logger.info("Starting model streaming")
-        
-        # Get messages and log them
-        try:
-            logger.info("Getting messages from history")
-            
-            # Handle both SQLChatMessageHistory and simple list
-            if hasattr(self.history, 'get_messages'):
-                # SQLChatMessageHistory
-                messages = self.history.get_messages()
-            else:
-                # Simple list fallback
-                messages = self.history
-            
-            logger.info(f"Retrieved messages successfully: {len(messages)} messages")
-        except Exception as e:
-            logger.error(f"Error getting messages from history: {e} (type: {type(e)})")
-            raise e
+        # Get messages for streaming
+        logger.info("Getting messages from history")
+        messages = self.history.get_messages()
+        logger.info(f"Retrieved {len(messages)} messages successfully")
         logger.info(f"Messages to stream: {len(messages)} messages")
         for i, msg in enumerate(messages):
             logger.debug(f"Message {i}: {type(msg)} - {msg.content[:100] if hasattr(msg, 'content') else str(msg)[:100]}")
@@ -256,16 +214,7 @@ class DietChatBot:
 
         # Add final response to history
         logger.info(f"Adding final response to history: '{response_content}'")
-        ai_msg = AIMessage(content=response_content)
-        
-        # Handle both SQLChatMessageHistory and simple list
-        if hasattr(self.history, 'add_message'):
-            # SQLChatMessageHistory
-            self.history.add_message(ai_msg)
-        else:
-            # Simple list fallback
-            self.history.append(ai_msg)
-            self._save_message_to_db(ai_msg)
+        self.history.add_message(AIMessage(content=response_content))
 
     def new_session(self) -> None:
         """Create a new conversation."""
@@ -282,12 +231,7 @@ class DietChatBot:
 
     def get_messages(self) -> List[BaseMessage]:
         """Get all messages from the current session."""
-        if hasattr(self.history, 'get_messages'):
-            # SQLChatMessageHistory
-            return self.history.get_messages()
-        else:
-            # Simple list fallback
-            return self.history
+        return self.history.get_messages()
 
     @staticmethod
     def get_previous_conversations() -> List[str]:
