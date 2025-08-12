@@ -20,9 +20,9 @@ async def startup_event():
         print(f"Application startup: Database initialization failed: {e}")
         # Don't raise here to allow app to start even if DB is temporarily unavailable
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+# Mount static files - now flattened to root directory
+app.mount("/static", StaticFiles(directory="."), name="static")
+templates = Jinja2Templates(directory=".")
 
 
 @app.get("/", response_class=HTMLResponse)

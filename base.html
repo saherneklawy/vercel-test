@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Diet Planning Assistant{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', path='css/style.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', path='style.css') }}" rel="stylesheet">
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
@@ -19,7 +19,7 @@
         </main>
     </div>
     
-    <script src="{{ url_for('static', path='js/chat.js') }}"></script>
+    <script src="{{ url_for('static', path='chat.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

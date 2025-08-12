@@ -39,8 +39,8 @@ This is a FastAPI-based diet planning assistant with modern web architecture:
 ### Core Components
 1. **`main.py`** - FastAPI application with WebSocket endpoints and API routes
 2. **`logic.py`** - Contains `DietChatBot` class handling LLM interactions and persistence  
-3. **`templates/`** - Jinja2 HTML templates for the frontend
-4. **`static/`** - CSS and JavaScript assets for the web interface
+3. **`base.html`** and **`chat.html`** - Jinja2 HTML templates for the frontend
+4. **`style.css`** and **`chat.js`** - CSS and JavaScript assets for the web interface
 
 ### Data Flow
 ```
@@ -74,9 +74,9 @@ PostgreSQL database with LangChain integration:
 
 ### Frontend Architecture
 Modern web interface with vanilla JavaScript:
-- **Templates**: Jinja2 with template inheritance (`base.html`, `chat.html`)
-- **Styling**: Tailwind CSS with custom CSS for chat components
-- **JavaScript**: `ChatManager` class handling WebSocket and UI state
+- **Templates**: Jinja2 with template inheritance (flattened `base.html`, `chat.html`)
+- **Styling**: Tailwind CSS with custom CSS for chat components (flattened `style.css`)
+- **JavaScript**: `ChatManager` class handling WebSocket and UI state (flattened `chat.js`)
 - **Real-time Updates**: WebSocket client with connection management
 
 ## Environment Setup
@@ -152,10 +152,8 @@ CREATE INDEX idx_message_store_created_at ON message_store(created_at);
 ├── prompt.md            # System prompt for LLM
 ├── requirements.txt     # Python dependencies
 ├── vercel.json          # Vercel deployment config
-├── templates/
-│   ├── base.html        # Base template
-│   └── chat.html        # Chat interface
-└── static/
-    ├── css/style.css    # Custom styles
-    └── js/chat.js       # WebSocket chat client
+├── base.html            # Base template (flattened)
+├── chat.html            # Chat interface (flattened)
+├── style.css            # Custom styles (flattened)
+└── chat.js              # WebSocket chat client (flattened)
 ```
